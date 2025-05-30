@@ -56,6 +56,8 @@
         (setq init-file-debug t
               debug-on-error t))))
 
+  (load (expand-file-name "akn-pre-early-init.el" user-emacs-directory) 'noerror)
+
   (let (;; FIX: Unset `command-line-args' in noninteractive sessions, to
         ;;   ensure upstream switches aren't misinterpreted.
         (command-line-args (unless noninteractive command-line-args))
