@@ -1,5 +1,8 @@
 ;;; tools/tree-sitter/config.el -*- lexical-binding: t; -*-
 
+(defvar +tree-sitter--major-mode-remaps-alist nil)
+
+
 ;;
 ;;; Packages
 
@@ -9,12 +12,27 @@
   :defer t
   :config
   ;; HACK: treesit lacks any way to dictate where to install grammars.
+  (add-to-list 'treesit-extra-load-path doom-profile-data-dir)
   (defadvice! +tree-sitter--install-grammar-to-local-dir-a (fn &rest args)
     "Write grammars to `doom-profile-data-dir'."
     :around #'treesit-install-language-grammar
     :around #'treesit--build-grammar
     (let ((user-emacs-directory doom-profile-data-dir))
       (apply fn args)))
+
+  ;; HACK: Some *-ts-mode packages modify `major-mode-remap-defaults'
+  ;;   inconsistently. Playing whack-a-mole to undo those changes is more hassle
+  ;;   then simply ignoring them (by overriding `major-mode-remap-defaults' for
+  ;;   any modes remapped with `set-tree-sitter!'). The user shouldn't touch
+  ;;   `major-mode-remap-defaults' anyway; `major-mode-remap-alist' will always
+  ;;   have precedence.
+  (defadvice! +tree-sitter--ignore-default-major-mode-remaps-a (fn mode)
+    :around #'major-mode-remap
+    (let ((major-mode-remap-defaults
+           (if-let* ((m (assq mode +tree-sitter--major-mode-remaps-alist)))
+               +tree-sitter--major-mode-remaps-alist
+             major-mode-remap-defaults)))
+      (funcall fn mode)))
 
   ;; TODO: Move most of these out to modules
   (dolist (map '((awk "https://github.com/Beaglefoot/tree-sitter-awk" nil nil nil nil)
@@ -25,8 +43,6 @@
                  (commonlisp "https://github.com/tree-sitter-grammars/tree-sitter-commonlisp" nil nil nil nil)
                  (css "https://github.com/tree-sitter/tree-sitter-css" nil nil nil nil)
                  (dart "https://github.com/ast-grep/tree-sitter-dart" nil nil nil nil)
-                 (go "https://github.com/tree-sitter/tree-sitter-go" nil nil nil nil)
-                 (gomod "https://github.com/camdencheek/tree-sitter-go-mod" nil nil nil nil)
                  (html "https://github.com/tree-sitter/tree-sitter-html" nil nil nil nil)
                  (java "https://github.com/tree-sitter/tree-sitter-java" nil nil nil nil)
                  (javascript "https://github.com/tree-sitter/tree-sitter-javascript" "master" "src" nil nil)
