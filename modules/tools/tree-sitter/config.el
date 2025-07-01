@@ -1,8 +1,5 @@
 ;;; tools/tree-sitter/config.el -*- lexical-binding: t; -*-
 
-(defvar +tree-sitter--major-mode-remaps-alist nil)
-
-
 ;;
 ;;; Packages
 
@@ -12,7 +9,7 @@
   :defer t
   :config
   ;; HACK: treesit lacks any way to dictate where to install grammars.
-  (add-to-list 'treesit-extra-load-path doom-profile-data-dir)
+  (add-to-list 'treesit-extra-load-path (concat doom-profile-data-dir "tree-sitter"))
   (defadvice! +tree-sitter--install-grammar-to-local-dir-a (fn &rest args)
     "Write grammars to `doom-profile-data-dir'."
     :around #'treesit-install-language-grammar
@@ -39,10 +36,8 @@
                  (bibtex "https://github.com/latex-lsp/tree-sitter-bibtex" nil nil nil nil)
                  (blueprint "https://github.com/huanie/tree-sitter-blueprint" nil nil nil nil)
                  (c-sharp "https://github.com/tree-sitter/tree-sitter-c-sharp" nil nil nil nil)
-                 (clojure "https://github.com/sogaiu/tree-sitter-clojure" nil nil nil nil)
                  (commonlisp "https://github.com/tree-sitter-grammars/tree-sitter-commonlisp" nil nil nil nil)
                  (css "https://github.com/tree-sitter/tree-sitter-css" nil nil nil nil)
-                 (dart "https://github.com/ast-grep/tree-sitter-dart" nil nil nil nil)
                  (html "https://github.com/tree-sitter/tree-sitter-html" nil nil nil nil)
                  (java "https://github.com/tree-sitter/tree-sitter-java" nil nil nil nil)
                  (javascript "https://github.com/tree-sitter/tree-sitter-javascript" "master" "src" nil nil)
