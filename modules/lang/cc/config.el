@@ -29,10 +29,8 @@ This is ignored by ccls.")
   ;;; Improve fontification in C/C++ (also see `modern-cpp-font-lock')
   :init
   (when (modulep! +tree-sitter)
-    (set-tree-sitter! 'c-mode 'c-ts-mode
-      '((c :url "https://github.com/tree-sitter/tree-sitter-c")))
-    (set-tree-sitter! 'c++-mode 'c++-ts-mode
-      '((cpp :url "https://github.com/tree-sitter/tree-sitter-cpp"))))
+    (set-tree-sitter! 'c-mode 'c-ts-mode 'c)
+    (set-tree-sitter! 'c++-mode 'c++-ts-mode 'cpp))
 
   :config
   (set-docsets! '(c-mode c-ts-mode) "C")
@@ -115,8 +113,7 @@ This is ignored by ccls.")
   :init
   (when (and (modulep! +tree-sitter)
              (boundp 'cmake-ts-mode)) ; 29+ only
-    (set-tree-sitter! 'cmake-mode 'cmake-ts-mode
-      '((cmake :url "https://github.com/uyha/tree-sitter-cmake"))))
+    (set-tree-sitter! 'cmake-mode 'cmake-ts-mode 'cmake))
   :config
   (set-docsets! '(cmake-mode cmake-ts-mode) "CMake")
   (set-popup-rule! "^\\*CMake Help\\*" :size 0.4 :ttl t)
@@ -159,12 +156,7 @@ This is ignored by ccls.")
     '((cuda :url "https://github.com/tree-sitter-grammars/tree-sitter-cuda")))
   :config
   (when (modulep! +lsp)
-    (add-hook 'cuda-ts-mode-local-vars-hook #'lsp! 'append))
-  ;; HACK: Remove redundant entries so we can rely solely on
-  ;;   `major-mode-remap-defaults' et co.
-  (rassq-delete-all 'cuda-ts-mode auto-mode-alist)
-  (cl-callf2 delete '(cuda "https://github.com/tree-sitter-grammars/tree-sitter-cuda" nil nil nil nil)
-             treesit-language-source-alist))
+    (add-hook 'cuda-ts-mode-local-vars-hook #'lsp! 'append)))
 
 
 (use-package! demangle-mode

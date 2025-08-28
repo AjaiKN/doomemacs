@@ -7,15 +7,44 @@
   :when (fboundp 'treesit-available-p)
   :when (treesit-available-p)
   :defer t
+  :preface
+  (setq treesit-enabled-modes t)
+
+  ;; HACK: The *-ts-mode major modes are inconsistent about how they treat
+  ;;   missing language grammars (some error out, some respect
+  ;;   `treesit-auto-install-grammar', some fall back to `fundamental-mode').
+  ;;   I'd like to address this poor UX using `major-mode-remap-alist' entries
+  ;;   created by `set-tree-sitter!' (which will fall back to the non-treesit
+  ;;   modes), but most *-ts-mode's clobber `auto-mode-alist' and/or
+  ;;   `interpreter-mode-alist' each time the major mode is activated, so those
+  ;;   must be undone too so they don't overwrite user config.
+  ;; TODO: Handle this during the 'doom sync' process instead.
+  (save-match-data
+    (dolist (sym '(auto-mode-alist interpreter-mode-alist))
+      (set
+       sym (cl-loop for (src . fn) in (symbol-value sym)
+                    unless (and (functionp fn)
+                                (string-match "-ts-mode\\(?:-maybe\\)?$" (symbol-name fn)))
+                    collect (cons src fn)))))
+
+  ;; HACK: These *-ts-modes change `auto-mode-alist' and/or
+  ;;   `interpreter-mode-alist' every time they are activated, running the risk
+  ;;   of overwriting user (or Doom) config.
+  ;; REVIEW: Should be addressed upstream.
+  (dolist (mode '(csharp-ts-mode
+                  python-ts-mode))
+    (advice-add mode :around #'+tree-sitter-ts-mode-inhibit-side-effects-a))
+
   :config
-  ;; HACK: treesit lacks any way to dictate where to install grammars.
-  (add-to-list 'treesit-extra-load-path (concat doom-profile-data-dir "tree-sitter"))
-  (defadvice! +tree-sitter--install-grammar-to-local-dir-a (fn &rest args)
-    "Write grammars to `doom-profile-data-dir'."
-    :around #'treesit-install-language-grammar
-    :around #'treesit--build-grammar
-    (let ((user-emacs-directory doom-profile-data-dir))
-      (apply fn args)))
+  ;; HACK: The implementation of `treesit-enabled-modes's setter and
+  ;;   `treesit-major-mode-remap-alist' is intrusively opinionated, so disable
+  ;;   it ato avoid untimely (and overriding) modifications of
+  ;;   `major-mode-remap-alist' at runtime. What's more, this was only
+  ;;   introduced in 31, so ignoring them is more consistent for pre-31 users.
+  (when major-mode-remap-alist
+    (dolist (m treesit-major-mode-remap-alist)
+      (setq major-mode-remap-alist (delete m major-mode-remap-alist))))
+  (setq treesit-major-mode-remap-alist nil)
 
   ;; HACK: Some *-ts-mode packages modify `major-mode-remap-defaults'
   ;;   inconsistently. Playing whack-a-mole to undo those changes is more hassle
@@ -31,15 +60,20 @@
              major-mode-remap-defaults)))
       (funcall fn mode)))
 
+  ;; HACK: Keep $EMACSDIR clean by installing grammars to the active profile.
+  (add-to-list 'treesit-extra-load-path (concat doom-profile-data-dir "tree-sitter"))
+  (defadvice! +tree-sitter--install-grammar-to-local-dir-a (fn &rest args)
+    "Write grammars to `doom-profile-data-dir'."
+    :around #'treesit-install-language-grammar
+    :around #'treesit--build-grammar
+    (let ((user-emacs-directory doom-profile-data-dir))
+      (apply fn args)))
+
   ;; TODO: Move most of these out to modules
   (dolist (map '((awk "https://github.com/Beaglefoot/tree-sitter-awk" nil nil nil nil)
                  (bibtex "https://github.com/latex-lsp/tree-sitter-bibtex" nil nil nil nil)
                  (blueprint "https://github.com/huanie/tree-sitter-blueprint" nil nil nil nil)
-                 (c-sharp "https://github.com/tree-sitter/tree-sitter-c-sharp" nil nil nil nil)
                  (commonlisp "https://github.com/tree-sitter-grammars/tree-sitter-commonlisp" nil nil nil nil)
-                 (css "https://github.com/tree-sitter/tree-sitter-css" nil nil nil nil)
-                 (html "https://github.com/tree-sitter/tree-sitter-html" nil nil nil nil)
-                 (java "https://github.com/tree-sitter/tree-sitter-java" nil nil nil nil)
                  (javascript "https://github.com/tree-sitter/tree-sitter-javascript" "master" "src" nil nil)
                  (latex "https://github.com/latex-lsp/tree-sitter-latex" nil nil nil nil)
                  (make "https://github.com/tree-sitter-grammars/tree-sitter-make" nil nil nil nil)
@@ -48,7 +82,6 @@
                  (perl "https://github.com/ganezdragon/tree-sitter-perl" nil nil nil nil)
                  (proto "https://github.com/mitchellh/tree-sitter-proto" nil nil nil nil)
                  (r "https://github.com/r-lib/tree-sitter-r" nil nil nil nil)
-                 (rust "https://github.com/tree-sitter/tree-sitter-rust" nil nil nil nil)
                  (sql "https://github.com/DerekStride/tree-sitter-sql" "gh-pages" nil nil nil)
                  (surface "https://github.com/connorlay/tree-sitter-surface" nil nil nil nil)
                  (toml "https://github.com/tree-sitter/tree-sitter-toml" nil nil nil nil)
