@@ -65,15 +65,6 @@
 
   :config
   (when (modulep! +lsp)
-    (setq-hook! 'scala-ts-mode-hook lsp-enable-indentation nil)
-    (add-hook 'scala-ts-mode-local-vars-hook #'lsp! 'append))
-
-  ;; HACK: Rely on `major-mode-remap-defaults'.
-  (cl-callf2 assq-delete-all 'scala-ts-mode auto-mode-alist)
+    (setq-hook! 'scala-ts-mode-hook lsp-enable-indentation nil))
 
   (+scala-common-config 'scala-ts-mode))
-
-
-(use-package! sbt-mode
-  :after scala-mode
-  :config (set-repl-handler! '(scala-mode scala-ts-mode) #'+scala/open-repl :persist t))
