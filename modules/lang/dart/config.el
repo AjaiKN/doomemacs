@@ -25,7 +25,7 @@
     (add-hook (intern (format "%s-local-vars-hook" mode)) #'lsp! 'append)))
 
 (use-package! dart-mode
-  :defer t
+  :hook (dart-mode . rainbow-delimiters-mode)
   :config
   (+dart-common-config 'dart-mode))
 

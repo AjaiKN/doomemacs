@@ -45,17 +45,27 @@
       (if-let* ((ts (get mode '+tree-sitter))
                 (fallback-mode (car ts)))
           (cond ((not (fboundp mode))
-                 (message "Couldn't find %S, falling back to %S" mode fallback-mode)
+                 (message "Couldn't find `%S', falling back to `%S'" mode fallback-mode)
                  fallback-mode)
                 ((and (or (eq treesit-enabled-modes t)
                           (memq fallback-mode treesit-enabled-modes))
                       ;; Lazily load autoloaded `treesit-language-source-alist'
                       ;; entries.
-                      (let ((fn (symbol-function mode)))
+                      (let ((fn (symbol-function mode))
+                            ;; Silence "can't find grammar" warning popups from
+                            ;; `treesit-ready-p' calls in Emacs <=30.1. We'll
+                            ;; log it to *Messages* instead.
+                            (warning-suppress-types
+                             (cons '(treesit) warning-suppress-types)))
                         (or (not (autoloadp fn))
                             (autoload-do-load fn mode)))
                       ;; Only prompt once, and log other times.
-                      (or (null (cdr ts))
+                      (or (null (cdr ts))  ; no grammars, no problem!
+                          ;; If the base/fallback mode doesn't exist, let's
+                          ;; assume we want no fallthrough for this major mode
+                          ;; and push forward anyway, even if a missing grammar
+                          ;; results in a broken state.
+                          (not (fboundp fallback-mode))
                           (cl-every (if (get mode '+tree-sitter-ensured)
                                         (doom-rpartial #'treesit-ready-p 'message)
                                       #'treesit-ensure-installed)
