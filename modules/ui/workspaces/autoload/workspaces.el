@@ -43,10 +43,14 @@
    #'buffer-live-p
    (if tabs
        (cl-remove-duplicates
-        (cl-loop for tab in tabs
-                 if (and tab (not (eq (car-safe tab) 'current-tab)))
-                 nconc (alist-get 'wc-bl tab)
-                 nconc (alist-get 'wc-bbl tab))
+        (cl-loop for tab in (delq nil tabs)
+                 for ws = (if (numberp tab) (nth tab (tab-bar-tabs)) tab)
+                 if (eq (car-safe ws) 'current-tab)
+                 append (append (frame-parameter nil 'buffer-list)
+                                (frame-parameter nil 'bured-buffer-list))
+                 else
+                 append (append (alist-get 'wc-bl (cdr ws))
+                                (alist-get 'wc-bbl (cdr ws))))
         :test #'eq)
      (append (frame-parameter nil 'buffer-list)
              (frame-parameter nil 'buried-buffer-list)
@@ -127,10 +131,12 @@ workspace."
     (tab-bar-switch-to-recent-tab)))
 
 ;;;###autoload
-(defun +workspaces-remove-buffer-from-tab (buffer tab)
+(defun +workspaces-remove-buffer-from-tab (buffer &optional tab)
   "Remove BUFFER from TAB."
   (cl-check-type buffer buffer)
-  (with-current-workspace tab
+  (if tab
+      (with-current-workspace tab
+        (tabspaces-remove-buffer buffer))
     (tabspaces-remove-buffer buffer)))
 
 
@@ -153,14 +159,14 @@ workspace."
 (defalias '+workspaces/kill-other #'tab-bar-close-other-tabs)
 
 ;;;###autoload
-(cl-defun +workspaces/kill (&optional (tab-number (tab-bar--current-tab-index)))
-  "Kill all buffers in the workspace and then close the workspace itself."
-  (interactive "P")
-  (unless tab-number
+(defun +workspaces/kill (tab-index)
+  "Kill workspace a TAB-INDEX (zero-based) and kill its exclusive buffers."
+  (interactive (list (tab-bar--current-tab-index)))
+  (unless tab-index
     (user-error "No tab number specified"))
   (let* ((current-idx (tab-bar--current-tab-index))
-         (tab-idx (or tab-number current-idx))
-         (tab-buffers (+workspaces-buffer-list tab-idx (selected-frame)))
+         (tab-idx (or tab-index current-idx))
+         (tab-buffers (+workspaces-buffer-list tab-idx))
          (other-buffers
           (delete-dups
            (cl-loop for ws in (tab-bar-tabs)
@@ -171,7 +177,7 @@ workspace."
                  unless (member b other-buffers)  ; only kill if not open elsewhere
                  when (buffer-live-p b)
                  do (kill-buffer b))
-      (tab-bar-close-tab tab-idx))))
+      (tab-bar-close-tab (1+ tab-idx)))))
 
 ;;;###autoload
 (defalias '+workspaces/rename #'tab-bar-rename-tab)
@@ -223,7 +229,8 @@ its associated frame, if one exists) and move to the next."
              (window-dedicated-p)
              (not (bound-and-true-p tabspaces-mode)))
          (funcall (if (featurep 'evil) #'evil-window-delete #'delete-window)))
-        ((cdr (tab-bar-tabs)) (+workspaces/kill))
+        ((cdr (tab-bar-tabs))
+         (call-interactively #'+workspaces/kill))
         ((user-error "Can't delete last workspace"))))
 
 ;;; workspaces.el ends here
