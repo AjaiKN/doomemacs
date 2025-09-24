@@ -88,6 +88,15 @@ index. If NOERROR? is omitted, throws an error if NAME doesn't exist."
       (user-error "No workspace found: %s" name))))
 
 ;;;###autoload
+(defun +workspaces-get-by-id (id)
+  "Return the tab by unique ID."
+  (catch 'result
+    (dolist (fr (frame-list))
+      (dolist (tab (tab-bar-tabs fr))
+        (when (equal id (alist-get 'id tab))
+          (throw 'result tab))))))
+
+;;;###autoload
 (defalias '+workspaces-exists-p #'tab-bar--tab-index-by-name)
 
 ;;;###autoload
@@ -138,6 +147,43 @@ workspace."
       (with-current-workspace tab
         (tabspaces-remove-buffer buffer))
     (tabspaces-remove-buffer buffer)))
+
+;;;###autoload
+(defun +workspaces-parameter (workspace param &optional default)
+  "Return a WORKSPACE's PARAM, otherwise DEFAULT."
+  (if-let* ((table (gethash (alist-get 'id (or workspace (+workspaces-current)))
+                            +workspaces--parameters)))
+      (gethash param table default)
+    default))
+
+;;;###autoload
+(defun +workspaces-parameter-set (workspace param val)
+  "Set a WORKSPACE's PARAM to VAL"
+  (let* ((workspace (or workspace (+workspaces-current)))
+         (id (or (alist-get 'id workspace)
+                 (error "Workspace has no id attribute: %S" workspace))))
+    (puthash param val (or (gethash id +workspaces--parameters)
+                           (error "Invalid workspace ID: %s" id)))))
+
+
+;;
+;;; Hooks
+
+;;;###autoload
+(defun +workspaces-init-parameters-h (tab)
+  "Initialize the current workspace's parameters."
+  (puthash (alist-get 'id tab) (make-hash-table :test 'eq)
+           +workspaces--parameters))
+
+;;;###autoload
+(defun +workspaces-cleanup-parameters-h (_tab _last-tab?)
+  "Cleanup workspace parameters for forgotten workspaces."
+  (dolist (id (hash-table-keys +workspaces--parameters))
+    (or (cl-loop for tab in tab-bar-closed-tabs
+                 for tid = (map-nested-elt tab '(tab id))
+                 unless (eq (gethash tid +workspaces--parameters t) t)
+                 return t)
+        (remhash id +workspaces--parameters))))
 
 
 ;;
@@ -232,5 +278,72 @@ its associated frame, if one exists) and move to the next."
         ((cdr (tab-bar-tabs))
          (call-interactively #'+workspaces/kill))
         ((user-error "Can't delete last workspace"))))
+
+;;;###autoload
+(defun +workspaces/open-in-project (project &optional force?)
+  "Open an existing or new workspace for PROJECT.
+
+Afterwards, executes `+workspaces-switch-project-function', if set.
+
+If FORCE?, always create a workspace, even if it already exists."
+  (interactive
+   (list (if-let* ((projects (projectile-relevant-known-projects)))
+             (projectile-completing-read "Switch to project: " projects)
+           (user-error "There are no known projects"))
+         current-prefix-arg))
+  (let* ((project (expand-file-name project))
+         (existing-tab-names (tabspaces--list-tabspaces))
+         (original-tab-name (or (cdr (assoc project tabspaces-project-tab-map))
+                                (tabspaces-generate-descriptive-tab-name project existing-tab-names)))
+         (tab-name original-tab-name)
+         (session (tabspaces--get-project-session-file-for-restore project))
+         (project-directory project)  ; Use the full path as the project directory
+         (project-exists (cl-member project projectile-known-projects :test #'file-equal-p))
+         (create-new-tab (or force? (not (member tab-name existing-tab-names)))))
+
+    (with-current-buffer (doom-fallback-buffer)
+      (setq-local default-directory project-directory))
+
+    (cond
+     ;; If there is no tab nor project, create both
+     ((not project-exists)
+      (message "Creating new workspace for project...")
+      (tab-bar-new-tab)
+      (tab-bar-rename-tab tab-name)
+      (projectile-add-known-project project-directory)
+      (switch-to-buffer (doom-fallback-buffer)))
+
+     ;; If project and tab exist, but we want a new tab
+     ((and project-exists
+           (member tab-name existing-tab-names)
+           create-new-tab)
+      (message "Creating new workspace for known project...")
+      (let ((new-tab-name (generate-unique-numbered-tab-name tab-name existing-tab-names)))
+        (tab-bar-new-tab)
+        (tab-bar-rename-tab new-tab-name)
+        (setq tab-name new-tab-name)
+        (switch-to-buffer (doom-fallback-buffer))))
+
+     ;; If project and tab exist, switch to it
+     ((and project-exists
+           (member tab-name existing-tab-names))
+      (message "Switching to existing project workspace...")
+      (tab-bar-switch-to-tab tab-name))
+
+     ;; If project exists, but no corresponding tab, open a new tab
+     (project-exists
+      (message "Creating new workspace for existing project...")
+      (tab-bar-new-tab)
+      (tab-bar-rename-tab tab-name)
+      (if (file-exists-p session)
+          (tabspaces-restore-session session)
+        (switch-to-buffer (doom-fallback-buffer))))
+
+     ((user-error "Failed to find the project or create a workspace")))
+
+    ;; Update tabspaces-project-tab-map (only for the main tab, not numbered duplicates)
+    (unless (string-match-p "<[0-9]+>$" tab-name)
+      (setf (alist-get project-directory tabspaces-project-tab-map nil nil #'equal)
+            tab-name))))
 
 ;;; workspaces.el ends here

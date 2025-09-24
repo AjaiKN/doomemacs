@@ -223,6 +223,13 @@ the frame through some other means.")
 ;;
 ;;; Buffers
 
+;; Open to the fallback buffer on new tabs, but don't set
+;; `initial-buffer-choice' here because that has startup performance
+;; implications. Leave that to :ui doom-dashboard.
+(setq tab-line-new-tab-choice #'doom-fallback-buffer
+      tab-bar-new-tab-choice #'doom-fallback-buffer
+      tab-bar-close-last-tab-choice (lambda (_) (doom/kill-all-buffers)))
+
 (defadvice! doom--switch-to-fallback-buffer-maybe-a (&rest _)
   "Switch to `doom-fallback-buffer' if on last real buffer.
 
@@ -526,12 +533,7 @@ windows, switch to `doom-fallback-buffer'. Otherwise, delegate to original
              nerd-icons-devicon
              nerd-icons-ipsicon
              nerd-icons-pomicon
-             nerd-icons-powerline)
-  :config
-  ;; REVIEW: Remove when rainstormstudio/nerd-icons#120 is merged.
-  (cl-callf2 assoc-delete-all "go" nerd-icons-dir-icon-alist)
-  (setf (alist-get "^go$" nerd-icons-dir-icon-alist nil nil #'equal)
-        '(nerd-icons-devicon "nf-dev-go")))
+             nerd-icons-powerline))
 
 ;; Hide the mode line in completion popups and MAN pages because they serve
 ;; little purpose there, and is better hidden.
